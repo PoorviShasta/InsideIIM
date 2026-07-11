@@ -1,10 +1,11 @@
-import { ChatAnthropic } from "@langchain/anthropic";
+import { ChatGroq } from "@langchain/groq";
 import { TavilySearch } from "@langchain/tavily";
 import { StateGraph, Annotation, START, END } from "@langchain/langgraph";
 import { z } from "zod";
 
-const model = new ChatAnthropic({
-  model: process.env.ANTHROPIC_MODEL || "claude-opus-4-8",
+const model = new ChatGroq({
+  model: process.env.GROQ_MODEL || "llama-3.3-70b-versatile",
+  temperature: 0.2,
   maxTokens: 4096,
 });
 
