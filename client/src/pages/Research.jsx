@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const SEARCH_STEPS = [
-  { id: "profileSearch", label: "Company profile" },
-  { id: "financialsSearch", label: "Financials" },
-  { id: "newsSearch", label: "News and risks" },
-  { id: "competitionSearch", label: "Competition" },
+  { id: "profileSearch", label: "Company profile", log: "Profile research complete" },
+  { id: "financialsSearch", label: "Financials", log: "Financials research complete" },
+  { id: "newsSearch", label: "News and risks", log: "News and risk scan complete" },
+  { id: "competitionSearch", label: "Competition", log: "Competitive landscape mapped" },
 ];
 
 const PIPELINE = [
@@ -12,6 +12,33 @@ const PIPELINE = [
   { id: "analyze", label: "Analyst review" },
   { id: "decide", label: "Final decision" },
 ];
+
+const COMPANIES = {
+  "Global tech": [
+    { name: "Nvidia", tag: "Semiconductors" },
+    { name: "Apple", tag: "Consumer tech" },
+    { name: "Microsoft", tag: "Software and cloud" },
+    { name: "Tesla", tag: "EV and energy" },
+  ],
+  "Indian consumer": [
+    { name: "Zomato", tag: "Food delivery" },
+    { name: "Swiggy", tag: "Food delivery" },
+    { name: "Nykaa", tag: "Beauty commerce" },
+    { name: "DMart", tag: "Retail" },
+  ],
+  "Auto and mobility": [
+    { name: "Tata Motors", tag: "Automotive" },
+    { name: "Ola Electric", tag: "Electric two wheelers" },
+    { name: "Maruti Suzuki", tag: "Automotive" },
+    { name: "Ather Energy", tag: "Electric two wheelers" },
+  ],
+  "High risk watchlist": [
+    { name: "Byju's", tag: "Edtech" },
+    { name: "Vodafone Idea", tag: "Telecom" },
+    { name: "Paytm", tag: "Fintech" },
+    { name: "WeWork", tag: "Flexible workspace" },
+  ],
+};
 
 function stepState(id, completed, status) {
   if (completed.has(id)) return "done";
@@ -37,18 +64,64 @@ export default function Research() {
   const [decision, setDecision] = useState(null);
   const [error, setError] = useState("");
   const [showReport, setShowReport] = useState(false);
+  const [log, setLog] = useState([]);
+  const [elapsed, setElapsed] = useState(0);
+  const [tab, setTab] = useState(Object.keys(COMPANIES)[0]);
+  const [shownConfidence, setShownConfidence] = useState(0);
+  const consoleRef = useRef(null);
 
-  async function runResearch(event) {
-    event.preventDefault();
-    const name = company.trim();
+  useEffect(() => {
+    if (status !== "running") return;
+    const started = Date.now();
+    const id = setInterval(
+      () => setElapsed(Math.floor((Date.now() - started) / 1000)),
+      1000
+    );
+    return () => clearInterval(id);
+  }, [status]);
+
+  useEffect(() => {
+    if (consoleRef.current) {
+      consoleRef.current.scrollTop = consoleRef.current.scrollHeight;
+    }
+  }, [log]);
+
+  useEffect(() => {
+    if (!decision) return;
+    let value = 0;
+    const target = decision.confidence;
+    const id = setInterval(() => {
+      value += Math.max(1, Math.round(target / 40));
+      if (value >= target) {
+        value = target;
+        clearInterval(id);
+      }
+      setShownConfidence(value);
+    }, 20);
+    return () => clearInterval(id);
+  }, [decision]);
+
+  function pushLog(msg) {
+    setLog((prev) => [
+      ...prev,
+      { at: new Date().toLocaleTimeString(), msg, key: Date.now() + msg },
+    ]);
+  }
+
+  async function startResearch(rawName) {
+    const name = (rawName || "").trim();
     if (!name || status === "running") return;
 
+    setCompany(name);
     setStatus("running");
     setCompleted(new Set());
     setAnalysis("");
     setDecision(null);
     setError("");
     setShowReport(false);
+    setLog([]);
+    setElapsed(0);
+    setShownConfidence(0);
 
     try {
       const res = await fetch("/api/research", {
@@ -82,96 +155,184 @@ export default function Research() {
   }
 
   function handleEvent(event, name) {
-    if (event.type === "step") {
-      setCompleted((prev) => new Set(prev).add(event.step));
+    if (event.type === "start") {
+      pushLog(`Dispatching four research agents for ${name}`);
+    } else if (event.type === "step") {
+      const step = SEARCH_STEPS.find((s) => s.id === event.step);
+      if (step) pushLog(step.log);
+      setCompleted((prev) => {
+        const next = new Set(prev).add(event.step);
+        if (SEARCH_STEPS.every((s) => next.has(s.id))) {
+          pushLog("All sources gathered, analyst drafting the report");
+        }
+        return next;
+      });
     } else if (event.type === "analysis") {
       setAnalysis(event.analysis);
       setCompleted((prev) => new Set(prev).add("analyze"));
+      pushLog("Analyst report ready, investment committee is voting");
     } else if (event.type === "decision") {
       setDecision(event.decision);
       setCompleted((prev) => new Set(prev).add("decide"));
+      pushLog(`Committee verdict: ${event.decision.verdict}`);
       saveRun(name, event.decision);
     } else if (event.type === "error") {
       throw new Error(event.message);
     }
   }
 
+  const progress = Math.round((completed.size / PIPELINE.length) * 100);
+
   return (
     <>
-      <header>
-        <h2>Research a company</h2>
-        <p className="tagline">
-          Give it a name. It researches the web, weighs the evidence, and calls
-          invest or pass.
-        </p>
+      <header className="page-head">
+        <div>
+          <h2>Research workspace</h2>
+          <p className="tagline">
+            Pick a company or type one. Watch the agents work in real time.
+          </p>
+        </div>
+        {status !== "idle" && (
+          <span className={`timer-chip ${status}`}>
+            {status === "running" ? "Analyzing" : status === "done" ? "Complete" : "Failed"}
+            <em>{elapsed}s</em>
+          </span>
+        )}
       </header>
 
-      <form className="search-form" onSubmit={runResearch}>
+      <form
+        className="search-form"
+        onSubmit={(e) => {
+          e.preventDefault();
+          startResearch(company);
+        }}
+      >
         <input
           value={company}
           onChange={(e) => setCompany(e.target.value)}
-          placeholder="e.g. Zomato, Nvidia, Ola Electric"
+          placeholder="Type any company, listed or private"
           disabled={status === "running"}
         />
         <button type="submit" disabled={status === "running" || !company.trim()}>
-          {status === "running" ? "Researching..." : "Research"}
+          {status === "running" ? "Researching..." : "Run analysis"}
         </button>
       </form>
 
-      {status !== "running" && (
-        <div className="chips">
-          <span className="chips-label">Try:</span>
-          {["Nvidia", "Zomato", "Tata Motors", "Swiggy"].map((name) => (
-            <button
-              key={name}
-              type="button"
-              className="chip"
-              onClick={() => setCompany(name)}
-            >
-              {name}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {status !== "idle" && (
-        <section className="pipeline">
-          {PIPELINE.map((step) => {
-            const state = stepState(step.id, completed, status);
-            return (
-              <div key={step.id} className={`step ${state}`}>
-                <span className="dot" />
-                <span>{step.label}</span>
-              </div>
-            );
-          })}
+      {status === "idle" && (
+        <section className="universe anim">
+          <div className="tabs">
+            {Object.keys(COMPANIES).map((sector) => (
+              <button
+                key={sector}
+                type="button"
+                className={`tab ${tab === sector ? "active" : ""}`}
+                onClick={() => setTab(sector)}
+              >
+                {sector}
+              </button>
+            ))}
+          </div>
+          <div className="company-grid">
+            {COMPANIES[tab].map((c, i) => (
+              <button
+                key={c.name}
+                type="button"
+                className="company-card anim"
+                style={{ animationDelay: `${i * 60}ms` }}
+                onClick={() => startResearch(c.name)}
+              >
+                <span className="company-avatar">{c.name[0]}</span>
+                <span className="company-info">
+                  <strong>{c.name}</strong>
+                  <small>{c.tag}</small>
+                </span>
+                <span className="company-go">→</span>
+              </button>
+            ))}
+          </div>
         </section>
       )}
 
-      {error && <div className="error">{error}</div>}
+      {status !== "idle" && (
+        <section className="run anim">
+          <div className="progress-wrap">
+            <div className="progress-meta">
+              <span>Pipeline progress</span>
+              <span>{progress}%</span>
+            </div>
+            <div className="progress-track">
+              <div className="progress-fill" style={{ width: `${progress}%` }} />
+            </div>
+          </div>
+
+          <div className="run-grid">
+            <div className="timeline">
+              {PIPELINE.map((step) => {
+                const state = stepState(step.id, completed, status);
+                return (
+                  <div key={step.id} className={`tstep ${state}`}>
+                    <span className="tstep-dot" />
+                    <span className="tstep-label">{step.label}</span>
+                    <span className="tstep-state">
+                      {state === "done" ? "done" : state === "running" ? "running" : "queued"}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="console" ref={consoleRef}>
+              {log.map((line) => (
+                <div key={line.key} className="console-line">
+                  <span className="console-time">{line.at}</span>
+                  <span>{line.msg}</span>
+                </div>
+              ))}
+              {status === "running" && (
+                <div className="console-line">
+                  <span className="console-time">now</span>
+                  <span className="cursor">working</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {error && <div className="error anim">{error}</div>}
 
       {decision && (
-        <section className="result">
+        <section className="result reveal">
           <div className="verdict-row">
-            <span className={`verdict ${decision.verdict.toLowerCase()}`}>
+            <span className={`verdict pop ${decision.verdict.toLowerCase()}`}>
               {decision.verdict}
             </span>
             <div className="confidence">
               <div className="confidence-label">
-                Confidence {decision.confidence}%
+                Confidence {shownConfidence}%
               </div>
               <div className="confidence-track">
                 <div
                   className="confidence-fill"
-                  style={{ width: `${decision.confidence}%` }}
+                  style={{ width: `${shownConfidence}%` }}
                 />
               </div>
             </div>
           </div>
 
-          <p className="thesis">{decision.thesis}</p>
+          <div className="meta-row anim" style={{ animationDelay: "120ms" }}>
+            <span className="meta-chip">{elapsed}s total</span>
+            <span className="meta-chip">{PIPELINE.length}/6 checks passed</span>
+            <span className="meta-chip">
+              {decision.strengths.length} strengths, {decision.risks.length} risks
+            </span>
+          </div>
 
-          <div className="columns">
+          <p className="thesis anim" style={{ animationDelay: "200ms" }}>
+            {decision.thesis}
+          </p>
+
+          <div className="columns anim" style={{ animationDelay: "300ms" }}>
             <div>
               <h3>Strengths</h3>
               <ul>
@@ -190,12 +351,12 @@ export default function Research() {
             </div>
           </div>
 
-          <p className="horizon">
+          <p className="horizon anim" style={{ animationDelay: "380ms" }}>
             <strong>Horizon:</strong> {decision.horizon}
           </p>
 
           {analysis && (
-            <div className="report">
+            <div className="report anim" style={{ animationDelay: "440ms" }}>
               <button
                 className="report-toggle"
                 onClick={() => setShowReport((v) => !v)}
@@ -206,6 +367,21 @@ export default function Research() {
             </div>
           )}
         </section>
+      )}
+
+      {status === "done" && (
+        <button
+          className="ghost-btn again anim"
+          onClick={() => {
+            setStatus("idle");
+            setCompany("");
+            setDecision(null);
+            setAnalysis("");
+            setLog([]);
+          }}
+        >
+          Research another company
+        </button>
       )}
     </>
   );
