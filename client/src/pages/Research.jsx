@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { COMPANIES } from "../data/companies.js";
 
 const SEARCH_STEPS = [
   { id: "profileSearch", label: "Company profile", log: "Profile research complete" },
@@ -13,32 +14,9 @@ const PIPELINE = [
   { id: "decide", label: "Final decision" },
 ];
 
-const COMPANIES = {
-  "Global tech": [
-    { name: "Nvidia", tag: "Semiconductors" },
-    { name: "Apple", tag: "Consumer tech" },
-    { name: "Microsoft", tag: "Software and cloud" },
-    { name: "Tesla", tag: "EV and energy" },
-  ],
-  "Indian consumer": [
-    { name: "Zomato", tag: "Food delivery" },
-    { name: "Swiggy", tag: "Food delivery" },
-    { name: "Nykaa", tag: "Beauty commerce" },
-    { name: "DMart", tag: "Retail" },
-  ],
-  "Auto and mobility": [
-    { name: "Tata Motors", tag: "Automotive" },
-    { name: "Ola Electric", tag: "Electric two wheelers" },
-    { name: "Maruti Suzuki", tag: "Automotive" },
-    { name: "Ather Energy", tag: "Electric two wheelers" },
-  ],
-  "High risk watchlist": [
-    { name: "Byju's", tag: "Edtech" },
-    { name: "Vodafone Idea", tag: "Telecom" },
-    { name: "Paytm", tag: "Fintech" },
-    { name: "WeWork", tag: "Flexible workspace" },
-  ],
-};
+const ALL_COMPANIES = Object.entries(COMPANIES).flatMap(([sector, list]) =>
+  list.map((c) => ({ ...c, sector }))
+);
 
 function stepState(id, completed, status) {
   if (completed.has(id)) return "done";
@@ -67,6 +45,7 @@ export default function Research() {
   const [log, setLog] = useState([]);
   const [elapsed, setElapsed] = useState(0);
   const [tab, setTab] = useState(Object.keys(COMPANIES)[0]);
+  const [filter, setFilter] = useState("");
   const [shownConfidence, setShownConfidence] = useState(0);
   const consoleRef = useRef(null);
 
@@ -220,31 +199,57 @@ export default function Research() {
 
       {status === "idle" && (
         <section className="universe anim">
-          <div className="tabs">
-            {Object.keys(COMPANIES).map((sector) => (
-              <button
-                key={sector}
-                type="button"
-                className={`tab ${tab === sector ? "active" : ""}`}
-                onClick={() => setTab(sector)}
-              >
-                {sector}
-              </button>
-            ))}
+          <div className="universe-head">
+            <input
+              className="universe-filter"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              placeholder={`Filter ${ALL_COMPANIES.length} companies...`}
+            />
+            <span className="universe-count">
+              {filter.trim()
+                ? `${ALL_COMPANIES.filter((c) =>
+                    c.name.toLowerCase().includes(filter.trim().toLowerCase())
+                  ).length} matches`
+                : `${ALL_COMPANIES.length} companies across ${
+                    Object.keys(COMPANIES).length
+                  } sectors`}
+            </span>
           </div>
+
+          {!filter.trim() && (
+            <div className="tabs">
+              {Object.keys(COMPANIES).map((sector) => (
+                <button
+                  key={sector}
+                  type="button"
+                  className={`tab ${tab === sector ? "active" : ""}`}
+                  onClick={() => setTab(sector)}
+                >
+                  {sector}
+                </button>
+              ))}
+            </div>
+          )}
+
           <div className="company-grid">
-            {COMPANIES[tab].map((c, i) => (
+            {(filter.trim()
+              ? ALL_COMPANIES.filter((c) =>
+                  c.name.toLowerCase().includes(filter.trim().toLowerCase())
+                )
+              : COMPANIES[tab].map((c) => ({ ...c, sector: tab }))
+            ).map((c, i) => (
               <button
-                key={c.name}
+                key={`${c.sector}-${c.name}`}
                 type="button"
                 className="company-card anim"
-                style={{ animationDelay: `${i * 60}ms` }}
+                style={{ animationDelay: `${Math.min(i, 12) * 45}ms` }}
                 onClick={() => startResearch(c.name)}
               >
                 <span className="company-avatar">{c.name[0]}</span>
                 <span className="company-info">
                   <strong>{c.name}</strong>
-                  <small>{c.tag}</small>
+                  <small>{filter.trim() ? `${c.tag} | ${c.sector}` : c.tag}</small>
                 </span>
                 <span className="company-go">→</span>
               </button>
