@@ -1,122 +1,191 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { useState } from "react";
 
-function App() {
-  const [count, setCount] = useState(0)
+const SEARCH_STEPS = [
+  { id: "profileSearch", label: "Company profile" },
+  { id: "financialsSearch", label: "Financials" },
+  { id: "newsSearch", label: "News and risks" },
+  { id: "competitionSearch", label: "Competition" },
+];
 
-  return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+const PIPELINE = [
+  ...SEARCH_STEPS,
+  { id: "analyze", label: "Analyst review" },
+  { id: "decide", label: "Final decision" },
+];
 
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+function stepState(id, completed, status) {
+  if (completed.has(id)) return "done";
+  if (status !== "running") return "pending";
+  const searchesDone = SEARCH_STEPS.every((s) => completed.has(s.id));
+  if (SEARCH_STEPS.some((s) => s.id === id)) return "running";
+  if (id === "analyze") return searchesDone ? "running" : "pending";
+  if (id === "decide") return completed.has("analyze") ? "running" : "pending";
+  return "pending";
 }
 
-export default App
+export default function App() {
+  const [company, setCompany] = useState("");
+  const [status, setStatus] = useState("idle");
+  const [completed, setCompleted] = useState(new Set());
+  const [analysis, setAnalysis] = useState("");
+  const [decision, setDecision] = useState(null);
+  const [error, setError] = useState("");
+  const [showReport, setShowReport] = useState(false);
+
+  async function runResearch(event) {
+    event.preventDefault();
+    const name = company.trim();
+    if (!name || status === "running") return;
+
+    setStatus("running");
+    setCompleted(new Set());
+    setAnalysis("");
+    setDecision(null);
+    setError("");
+    setShowReport(false);
+
+    try {
+      const res = await fetch("/api/research", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ company: name }),
+      });
+      if (!res.ok || !res.body) throw new Error("request failed");
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const chunks = buffer.split("\n\n");
+        buffer = chunks.pop();
+        for (const chunk of chunks) {
+          const line = chunk.trim();
+          if (!line.startsWith("data:")) continue;
+          handleEvent(JSON.parse(line.slice(5)));
+        }
+      }
+      setStatus("done");
+    } catch (err) {
+      setError(err.message || "something went wrong");
+      setStatus("error");
+    }
+  }
+
+  function handleEvent(event) {
+    if (event.type === "step") {
+      setCompleted((prev) => new Set(prev).add(event.step));
+    } else if (event.type === "analysis") {
+      setAnalysis(event.analysis);
+      setCompleted((prev) => new Set(prev).add("analyze"));
+    } else if (event.type === "decision") {
+      setDecision(event.decision);
+      setCompleted((prev) => new Set(prev).add("decide"));
+    } else if (event.type === "error") {
+      throw new Error(event.message);
+    }
+  }
+
+  return (
+    <div className="page">
+      <header>
+        <h1>Investment Research Agent</h1>
+        <p className="tagline">
+          Give it a company. It researches the web, weighs the evidence, and
+          calls invest or pass.
+        </p>
+      </header>
+
+      <form className="search-form" onSubmit={runResearch}>
+        <input
+          value={company}
+          onChange={(e) => setCompany(e.target.value)}
+          placeholder="e.g. Zomato, Nvidia, Ola Electric"
+          disabled={status === "running"}
+        />
+        <button type="submit" disabled={status === "running" || !company.trim()}>
+          {status === "running" ? "Researching..." : "Research"}
+        </button>
+      </form>
+
+      {status !== "idle" && (
+        <section className="pipeline">
+          {PIPELINE.map((step) => {
+            const state = stepState(step.id, completed, status);
+            return (
+              <div key={step.id} className={`step ${state}`}>
+                <span className="dot" />
+                <span>{step.label}</span>
+              </div>
+            );
+          })}
+        </section>
+      )}
+
+      {error && <div className="error">{error}</div>}
+
+      {decision && (
+        <section className="result">
+          <div className="verdict-row">
+            <span className={`verdict ${decision.verdict.toLowerCase()}`}>
+              {decision.verdict}
+            </span>
+            <div className="confidence">
+              <div className="confidence-label">
+                Confidence {decision.confidence}%
+              </div>
+              <div className="confidence-track">
+                <div
+                  className="confidence-fill"
+                  style={{ width: `${decision.confidence}%` }}
+                />
+              </div>
+            </div>
+          </div>
+
+          <p className="thesis">{decision.thesis}</p>
+
+          <div className="columns">
+            <div>
+              <h3>Strengths</h3>
+              <ul>
+                {decision.strengths.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <h3>Risks</h3>
+              <ul>
+                {decision.risks.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          <p className="horizon">
+            <strong>Horizon:</strong> {decision.horizon}
+          </p>
+
+          {analysis && (
+            <div className="report">
+              <button
+                className="report-toggle"
+                onClick={() => setShowReport((v) => !v)}
+              >
+                {showReport ? "Hide full analyst report" : "Show full analyst report"}
+              </button>
+              {showReport && <pre className="report-body">{analysis}</pre>}
+            </div>
+          )}
+        </section>
+      )}
+
+      <footer>Not financial advice. Built with LangGraph.js and Claude.</footer>
+    </div>
+  );
+}

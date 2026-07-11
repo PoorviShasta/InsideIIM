@@ -79,7 +79,14 @@ async function analyzeNode(state) {
       content: `Company: ${state.company}\n\n[COMPANY PROFILE]\n${state.profile}\n\n[FINANCIALS]\n${state.financials}\n\n[RECENT NEWS AND RISKS]\n${state.news}\n\n[COMPETITIVE LANDSCAPE]\n${state.competition}`,
     },
   ]);
-  return { analysis: response.content };
+  const analysis =
+    typeof response.content === "string"
+      ? response.content
+      : response.content
+          .filter((block) => block.type === "text")
+          .map((block) => block.text)
+          .join("\n");
+  return { analysis };
 }
 
 async function decideNode(state) {
