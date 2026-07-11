@@ -32,7 +32,10 @@ const ResearchState = Annotation.Root({
 async function runSearch(query) {
   const response = await search.invoke({ query });
   const parsed = typeof response === "string" ? JSON.parse(response) : response;
-  const results = parsed.results || [];
+  if (!parsed || !Array.isArray(parsed.results)) {
+    throw new Error("web search failed, check your TAVILY_API_KEY");
+  }
+  const results = parsed.results;
   if (!results.length) return "No results found.";
   return results
     .map((r) => `Source: ${r.title} (${r.url})\n${r.content}`)
