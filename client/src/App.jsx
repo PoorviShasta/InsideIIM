@@ -1,4 +1,4 @@
-import { Routes, Route, NavLink } from "react-router-dom";
+import { Routes, Route, NavLink, Link } from "react-router-dom";
 import Home from "./pages/Home.jsx";
 import Research from "./pages/Research.jsx";
 import History from "./pages/History.jsx";
@@ -8,9 +8,10 @@ export default function App() {
   return (
     <div className="shell">
       <nav className="navbar">
-        <NavLink to="/" className="brand">
-          Invest<span>Scout</span>
-        </NavLink>
+        <Link to="/" className="brand">
+          <span className="brand-mark">IS</span>
+          Invest<span className="brand-accent">Scout</span>
+        </Link>
         <div className="nav-links">
           <NavLink to="/" end>
             Home
@@ -19,6 +20,9 @@ export default function App() {
           <NavLink to="/history">History</NavLink>
           <NavLink to="/about">How it works</NavLink>
         </div>
+        <Link to="/research" className="nav-cta">
+          New research
+        </Link>
       </nav>
 
       <main className="page">
@@ -30,7 +34,15 @@ export default function App() {
         </Routes>
       </main>
 
-      <footer>Not financial advice. Built with LangGraph.js, Groq and Tavily.</footer>
+      <footer>
+        <div className="footer-inner">
+          <span className="footer-brand">InvestScout</span>
+          <span>
+            AI research demo, not financial advice. Built with LangGraph.js,
+            Groq and Tavily.
+          </span>
+        </div>
+      </footer>
     </div>
   );
 }

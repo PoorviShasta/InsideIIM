@@ -118,6 +118,22 @@ export default function Research() {
         </button>
       </form>
 
+      {status !== "running" && (
+        <div className="chips">
+          <span className="chips-label">Try:</span>
+          {["Nvidia", "Zomato", "Tata Motors", "Swiggy"].map((name) => (
+            <button
+              key={name}
+              type="button"
+              className="chip"
+              onClick={() => setCompany(name)}
+            >
+              {name}
+            </button>
+          ))}
+        </div>
+      )}
+
       {status !== "idle" && (
         <section className="pipeline">
           {PIPELINE.map((step) => {
