@@ -71,13 +71,34 @@ The Express endpoint `POST /api/research` runs the graph with `streamMode: "upda
 
 ## Example Runs
 
-> TODO: paste real outputs here after running locally with your keys.
-> Suggested companies: one large cap (Nvidia), one Indian consumer company (Zomato), one troubled company (Byju's) to show a PASS.
+Real outputs from local runs on the free tiers.
 
-**Company:**
-**Verdict:**
-**Confidence:**
-**Thesis:**
+### Nvidia
+
+- **Verdict:** INVEST
+- **Confidence:** 80%
+- **Thesis:** Nvidia's dominant market share in the AI chip market, strong financial health, and growth trajectory justify an investment decision. The company's platform approach and strategic focus on data center AI position it for continued success. While growing competition and regulatory risks are concerns, Nvidia's moat and innovative product offerings mitigate these risks.
+- **Strengths:** dominant market share in the AI chip market, strong financial health with high gross and operating margins, significant revenue growth
+- **Risks:** growing competition in the AI chip market, regulatory risks and lawsuits, dependence on AI demand
+- **Horizon:** long term holding, revisit in 12 to 18 months to assess competition and the regulatory landscape
+
+### Zomato
+
+- **Verdict:** INVEST
+- **Confidence:** 80%
+- **Thesis:** Zomato's diversified revenue streams, strong competitive position, and robust growth trajectory make it an attractive investment opportunity. The company's ability to consolidate its market position through strategic acquisitions, such as Uber Eats, and its vast network of gig workers and restaurant listings, contribute to its competitive advantages. However, the company's increasing losses and risks related to gig workers and automation must be closely monitored.
+- **Strengths:** diversified revenue streams, strong competitive position, vast network of gig workers and restaurant listings
+- **Risks:** increasing losses, gig worker related risks, automation
+- **Horizon:** medium term, suggested holding period of 2 to 3 years
+
+### Byju's
+
+- **Verdict:** PASS
+- **Confidence:** 80%
+- **Thesis:** Byju's is facing significant challenges, including a debt crisis, lawsuits, and intense competition, which threaten its financial health and growth trajectory. The company's valuation has been slashed, and its market share has fallen, making it a risky investment. While Byju's has a strong brand and a large user base, its inability to control costs and its overemphasis on growth have led to significant losses and a debt crisis.
+- **Strengths noted anyway:** large user base, strong brand, engaging learning platform
+- **Risks:** debt crisis, lawsuits and regulatory challenges, intense competition
+- **Horizon:** revisit in 6 to 12 months
 
 ## What I Would Improve With More Time
 

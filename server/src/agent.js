@@ -6,10 +6,25 @@ import { z } from "zod";
 const model = new ChatGroq({
   model: process.env.GROQ_MODEL || "llama-3.3-70b-versatile",
   temperature: 0.2,
-  maxTokens: 4096,
+  maxTokens: 1200,
+  maxRetries: 0,
 });
 
-const search = new TavilySearch({ maxResults: 5 });
+const search = new TavilySearch({ maxResults: 4 });
+
+async function withRateLimitRetry(fn) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      const message = err?.message || "";
+      if (attempt >= 2 || !message.includes("rate_limit_exceeded")) throw err;
+      const match = /try again in ([0-9.]+)s/.exec(message);
+      const waitMs = match ? Math.ceil(parseFloat(match[1]) * 1000) + 500 : 20000;
+      await new Promise((resolve) => setTimeout(resolve, waitMs));
+    }
+  }
+}
 
 const decisionSchema = z.object({
   verdict: z.enum(["INVEST", "PASS"]),
@@ -39,7 +54,7 @@ async function runSearch(query) {
   const results = parsed.results;
   if (!results.length) return "No results found.";
   return results
-    .map((r) => `Source: ${r.title} (${r.url})\n${r.content}`)
+    .map((r) => `Source: ${r.title} (${r.url})\n${(r.content || "").slice(0, 600)}`)
     .join("\n\n");
 }
 
@@ -72,7 +87,7 @@ async function competitionNode(state) {
 }
 
 async function analyzeNode(state) {
-  const response = await model.invoke([
+  const response = await withRateLimitRetry(() => model.invoke([
     {
       role: "system",
       content:
@@ -82,7 +97,7 @@ async function analyzeNode(state) {
       role: "user",
       content: `Company: ${state.company}\n\n[COMPANY PROFILE]\n${state.profile}\n\n[FINANCIALS]\n${state.financials}\n\n[RECENT NEWS AND RISKS]\n${state.news}\n\n[COMPETITIVE LANDSCAPE]\n${state.competition}`,
     },
-  ]);
+  ]));
   const analysis =
     typeof response.content === "string"
       ? response.content
@@ -97,7 +112,7 @@ async function decideNode(state) {
   const decider = model.withStructuredOutput(decisionSchema, {
     name: "investment_decision",
   });
-  const decision = await decider.invoke([
+  const decision = await withRateLimitRetry(() => decider.invoke([
     {
       role: "system",
       content:
@@ -107,7 +122,7 @@ async function decideNode(state) {
       role: "user",
       content: `Company: ${state.company}\n\nAnalyst report:\n${state.analysis}`,
     },
-  ]);
+  ]));
   return { decision };
 }
 
