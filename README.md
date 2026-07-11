@@ -40,6 +40,17 @@ Open http://localhost:5173, go to Research, type a company name, hit Research.
 
 `GROQ_MODEL` in `.env` is optional and defaults to `llama-3.3-70b-versatile`.
 
+## Deploying It (free)
+
+The Express server also serves the built React app, so the whole thing runs as one free web service on Render:
+
+1. Push this repo to GitHub.
+2. On https://render.com choose New, then Blueprint, and point it at the repo. The included `render.yaml` sets everything up.
+3. Add `GROQ_API_KEY` and `TAVILY_API_KEY` when prompted.
+4. Done. Render builds the client, starts the server, and serves the app at your `onrender.com` URL.
+
+Manual alternative on any Node host: `cd client && npm install && npm run build`, then `cd ../server && npm install && node src/index.js` with the two keys in the environment. Note that Render's free tier sleeps after idle, so the first request after a while takes about thirty seconds to wake up.
+
 ## How It Works
 
 The agent is a LangGraph state graph on the server:
