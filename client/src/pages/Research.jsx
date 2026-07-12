@@ -103,7 +103,7 @@ export default function Research() {
     setShownConfidence(0);
 
     try {
-      const res = await fetch("/api/research", {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/research`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ company: name }),
